@@ -57,3 +57,24 @@ def yaw_between(T_a, T_b):
     """Angle in radians between the optical axes of two camera poses."""
     za, zb = T_a[:3, 2], T_b[:3, 2]
     return float(np.arccos(np.clip(np.dot(za, zb), -1.0, 1.0)))
+
+
+def aligned_depth_to_color(depth_raw, depth_cam, color_cam, T_color_depth, scale_m=None):
+    """Warp a raw depth image into the colour camera: HxW float32 metres (z along the colour optical axis, 0 = no return).
+
+    raw units -> metres with depth_cam["scale_m"] (or scale_m if given, e.g. a corrected value), unproject with the
+    depth intrinsics, move to the colour frame with T_color_depth (depth sensor -> colour camera), project with the
+    colour intrinsics. Where several depth pixels land on one colour pixel the nearest wins (z-buffer). This is a
+    forward warp, so colour pixels no depth pixel maps to stay 0: expect holes when the two cameras differ in
+    resolution/focal length and an empty border strip when the principal points differ.
+    """
+    scale = depth_cam["scale_m"] if scale_m is None else scale_m
+    pts, _ = unproject(depth_raw.astype(np.float32) * scale, depth_cam)
+    uv, z = project(transform(T_color_depth, pts), color_cam)
+    u, v = np.round(uv[:, 0]).astype(int), np.round(uv[:, 1]).astype(int)
+    h, w = color_cam["height"], color_cam["width"]
+    ok = (z > 0) & (u >= 0) & (u < w) & (v >= 0) & (v < h)
+    out = np.full((h, w), np.inf, dtype=np.float32)
+    np.minimum.at(out, (v[ok], u[ok]), z[ok].astype(np.float32))
+    out[np.isinf(out)] = 0
+    return out
