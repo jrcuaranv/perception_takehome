@@ -10,6 +10,10 @@ Claude Code
 
 Each query is answered from one frame only: take the best detection of the right class, lift it to 3D with the depth image and pose, and return that point. It works well when the object is detected and the geometry is right (scene_b: 78% hit rate). It has two big weaknesses. First, my confidence is basically the detector score, so it doesn't know when the geometry is off (scene_a's AUROC is 0.17, worse than chance). Second, there is no memory across frames, so "nearest the stove" is never actually checked: the stove was never found in the same frame as the object being asked about.
 
+![scene_b: query, 2D detections and surveyed targets on sample frames](plots/part2_scene_b_samples.png)
+
+Orange boxes are detections of the queried class, grey boxes are everything else the detector found, and dashed green boxes are the surveyed target projected into the frame (dev ground truth). It's a good illustration of why this is hard: b03 and b05 are "qualified" queries where the reference class (stove, sink) isn't even detected, b02/b04 are genuinely absent, and b08 has several same-class boxes to choose between.
+
 ## Result (`uv run python score.py`, dev scenes)
 
 | Scene | Answered | Median spread (m) | Hit rate | Goal recall | Confidence AUROC | Abstain rate on absent |
