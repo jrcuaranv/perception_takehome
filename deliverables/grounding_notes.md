@@ -10,9 +10,9 @@ Claude Code
 
 Each query is answered from one frame only: take the best detection of the right class, lift it to 3D with the depth image and pose, and return that point. It works well when the object is detected and the geometry is right (scene_b: 78% hit rate). It has two big weaknesses. First, my confidence is basically the detector score, so it doesn't know when the geometry is off (scene_a's AUROC is 0.17, worse than chance). Second, there is no memory across frames, so "nearest the stove" is never actually checked: the stove was never found in the same frame as the object being asked about.
 
-![scene_b: query, 2D detections and surveyed targets on sample frames](plots/part2_scene_b_samples.png)
+![scene_b: query, 2D detections and surveyed targets on sample frames](plots/part2_scene_b_samples_3x3_raw.png)
 
-Orange boxes are detections of the queried class, grey boxes are everything else the detector found, and dashed green boxes are the surveyed target projected into the frame (dev ground truth). It's a good illustration of why this is hard: b03 and b05 are "qualified" queries where the reference class (stove, sink) isn't even detected, b02/b04 are genuinely absent, and b08 has several same-class boxes to choose between.
+Figure 1. query, 2D detections and surveyed targets on sample frames. Orange boxes are detections of the queried class, grey boxes are everything else the detector found, and dashed green boxes are the surveyed target projected into the frame (dev ground truth). It's a good illustration of why this is hard: b03 and b05 are "qualified" queries where the reference class (stove, sink) isn't even detected, b02/b04 are genuinely absent, and b08 has several same-class boxes to choose between.
 
 ## Result (`uv run python score.py`, dev scenes)
 
@@ -44,7 +44,7 @@ The rule is simple: I answer whenever the target class is detected (score ≥ 0.
 - **Plain query ("the oven"):** the highest-scoring detection of that class.
 - **Qualified query ("the chair nearest the stove"):** find the best-scoring reference (the stove) in the same frame, then choose the target closest to it in 3D. If the reference isn't detected, I fall back to the best-scoring target and lower the confidence.
 - **In practice the qualifier never fired.** In all four scenes the reference was never detected in a frame where a target was answered, so every qualified answer is really "best-scoring target".
-- **No memory across frames.** With several valid instances (chairs, sinks), different views can pick different ones. That's why the spread is large in scenes b and d (1.3–1.4 m). The code has a landmark-clustering helper that would fix both problems, but it belongs to Part 3 and isn't used here.
+- **No memory across frames.** With several valid instances (chairs, sinks), different views can pick different ones. That's why the spread is large in scenes b and d (1.3–1.4 m). 
 
 ## What my confidence measures
 

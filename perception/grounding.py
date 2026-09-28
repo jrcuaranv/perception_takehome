@@ -2,7 +2,7 @@
 
 Pipeline (see run_part2.py):
   frame_depth -> nms_2d -> mask_to_depth -> detection_to_3d -> dedupe_frame_candidates -> resolve_query
-Single-frame only. lift_scene_candidates/build_landmarks (scene-level memory) are kept for Part 3, not used here.
+Single-frame only; scene-level memory (persisting instances across frames) is Part 3, in perception/mapping.py.
 """
 
 from dataclasses import dataclass, field
@@ -83,25 +83,6 @@ def detection_to_3d(scene, frame, det, depth_m, cam, cfg):
             "point_world": point, "z": z, **info}
 
 
-def lift_scene_candidates(scene, detections, labels, cfg):
-    """{frame: [candidate, ...]} for every detection of the given labels that lifts to 3D."""
-    out = {}
-    for f_str, dets in detections.items():
-        f = int(f_str)
-        picked = [(k, d) for k, d in enumerate(dets) if d["label"] in labels and d["score"] >= cfg.min_score]
-        if not picked:
-            continue
-        depth, cam = frame_depth(scene, f, cfg)
-        cands = []
-        for k, d in picked:
-            c = detection_to_3d(scene, f, d, depth, cam, cfg)
-            if c is not None:
-                c["det_index"] = k
-                cands.append(c)
-        out[f] = dedupe_frame_candidates(cands, cfg.dedupe_radius)
-    return out
-
-
 def dedupe_frame_candidates(cands, radius):
     """3D non-maximum suppression: several boxes on one object in one frame collapse to the best-scoring one."""
     kept = []
@@ -109,64 +90,6 @@ def dedupe_frame_candidates(cands, radius):
         if not any(k["label"] == c["label"] and np.linalg.norm(k["point_world"] - c["point_world"]) < radius for k in kept):
             kept.append(c)
     return kept
-
-
-# ------------------------------------------------------------- scene memory --------------------------------------
-
-
-@dataclass
-class Landmark:
-    id: int
-    label: str
-    center: np.ndarray
-    n_frames: int
-    n_obs: int
-    mean_score: float
-
-
-def build_landmarks(cands_by_frame, radius):
-    """Cluster candidates across frames into world landmarks, per label. Assigns c['landmark'] (index into the
-    returned {label: [Landmark]} list, or None) on every candidate.
-
-    Greedy by score (best detections seed clusters), then one reassignment pass against the final centres.
-    This is what lets a query be answered with the same instance from every viewpoint, and lets 'nearest the stove'
-    use a stove that is not in the current frame."""
-    flat = [c for cs in cands_by_frame.values() for c in cs]
-    landmarks = {}
-    for label in sorted({c["label"] for c in flat}):
-        cs = sorted((c for c in flat if c["label"] == label), key=lambda c: -c["score"])
-        centers, weights = [], []
-        for c in cs:
-            p = c["point_world"]
-            if centers:
-                d = np.linalg.norm(np.array(centers) - p, axis=1)
-                j = int(d.argmin())
-                if d[j] < radius:
-                    w = weights[j]
-                    centers[j] = (centers[j] * w + p * c["score"]) / (w + c["score"])
-                    weights[j] = w + c["score"]
-                    continue
-            centers.append(p.copy())
-            weights.append(c["score"])
-        centers = np.array(centers)
-        assign = [int(np.linalg.norm(centers - c["point_world"], axis=1).argmin()) for c in cs]
-        lms = []
-        for j in range(len(centers)):
-            members = [c for c, a in zip(cs, assign) if a == j and np.linalg.norm(centers[j] - c["point_world"]) < radius]
-            if not members:
-                continue
-            w = np.array([m["score"] for m in members])
-            center = (np.array([m["point_world"] for m in members]) * w[:, None]).sum(0) / w.sum()
-            lms.append((center, members))
-        landmarks[label] = []
-        for i, (center, members) in enumerate(lms):
-            landmarks[label].append(Landmark(i, label, center, len({m["frame"] for m in members}), len(members),
-                                             float(np.mean([m["score"] for m in members]))))
-            for m in members:
-                m["landmark"] = i
-        for c in cs:
-            c.setdefault("landmark", None)
-    return landmarks
 
 
 # ------------------------------------------------------- query answering (single frame) -------------------------
