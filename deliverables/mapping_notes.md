@@ -43,7 +43,6 @@ There is no splitting. After all frames, I merge same-label instances whose cent
 **What I used**
 - **Class label.** A detection can only join an instance with the same label, so a chair never merges with a stool or a table. The cost is that one appliance detected as both "oven" and "stove" becomes two instances (see failure modes).
 - **Size prior.** Each class has a rough radius. It sets the gate (how far apart two views of one object can be, 1.5× the radius), it moves each lifted surface point one radius further along the viewing ray towards the object's centre so opposite views of a large object land together, and it defines when two same-frame boxes count as duplicates (closer than one radius).
-- **Detector score.** It weights the running centre and feeds the confidence and the support filter, so weak detections count for less.
 
 **What I tried and dropped: "two detections in one frame are different objects".** It's tempting, but the detector's redundant boxes break it.
 

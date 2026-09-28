@@ -27,7 +27,7 @@ Test scenes only get the label-free numbers, since we don't have their targets.
 
 ### Where I drew the line on answering, and why
 
-The rule is simple: I answer whenever the target class is detected (score ≥ 0.15) and its box has usable depth (at least 10 valid pixels, 0.3–6 m away). Otherwise I return `null` with confidence 0.1. I don't skip frames just because they look hard, since that would only make hit rate look better while goal recall drops.
+The rule is simple: I answer whenever the target class is detected (score ≥ 0.15, looking a balance between hit rate and recall) and its box has usable depth (at least 10 valid pixels, 0.3–6 m away). Otherwise I return `null` with confidence 0.1. 
 
 - **Absent frames:** all of them were `null`, because the detector found nothing of that class. That's right, but it's partly luck. The rule can't tell "absent" from "present but missed".
 - **The cost:** a few visible targets got no detection and so became `null` (a04 f=825, b03 f=492, b05 f=8 and f=264). That's most of the gap in goal recall.
